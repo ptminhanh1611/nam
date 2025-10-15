@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import time
 import pytz
-import os 
+import os
 from urllib.request import Request, urlopen # Dùng để gọi API
 
 # --- CẤU HÌNH TIMEZONE ---
@@ -99,7 +99,7 @@ def chat_with_gemini(user_prompt):
         return "Vui lòng cấu hình API Key để trò chuyện."
     
     # Lấy MHI
-    mhi_index = st.session_state.latest_climate_data.get('mhi', 'N/A')
+    mhi_index = st.session_state.latest_climate_data.get('mhi', 0.0) # Mặc định là 0.0 nếu chưa có
     
     latest_data_context = (
         f"Ngữ cảnh hiện tại (Trại Nấm): "
@@ -160,7 +160,7 @@ def process_data(json_data):
         'field1': 'Độ ẩm (%)',
         'field2': 'Nhiệt độ (°C)',
         'field3': 'Trạng thái Bơm', 
-        'field4': 'Trạng thái Quạt'  # THÊM FIELD 4
+        'field4': 'Trạng thái Quạt'
     })
     
     df['Thời gian'] = pd.to_datetime(df['Thời gian'])
@@ -169,168 +169,153 @@ def process_data(json_data):
     df['Độ ẩm (%)'] = pd.to_numeric(df['Độ ẩm (%)'], errors='coerce')
     df['Nhiệt độ (°C)'] = pd.to_numeric(df['Nhiệt độ (°C)'], errors='coerce')
     df['Trạng thái Bơm'] = pd.to_numeric(df['Trạng thái Bơm'], errors='coerce')
-    df['Trạng thái Quạt'] = pd.to_numeric(df['Trạng thái Quạt'], errors='coerce') # CHUYỂN ĐỔI FIELD 4
+    df['Trạng thái Quạt'] = pd.to_numeric(df['Trạng thái Quạt'], errors='coerce')
     
     df = df.sort_values('Thời gian', ascending=False).reset_index(drop=True)
     latest_data = df.iloc[0] if not df.empty else None
     
     return df, latest_data
 
-# 💡 LOGIC LÀM MỚI (RERUN) AN TOÀN - THAY THẾ WHILE TRUE
 def check_and_rerun():
     """Kiểm tra thời gian và tự động làm mới Streamlit."""
     current_time = time.time()
     if current_time - st.session_state["last_refresh_time"] >= REFRESH_INTERVAL_SECONDS:
-        st.session_state["last_refresh_time"] = current_time # Cập nhật thời gian làm mới
-        st.rerun() # Kích hoạt làm mới script
+        st.session_state["last_refresh_time"] = current_time
+        st.rerun()
 
-# ⚠️ HÀM HIỂN THỊ CẢNH BÁO TỰ ĐỘNG
 def display_alerts(temp, hum):
     """Kiểm tra các ngưỡng nguy hiểm và hiển thị cảnh báo."""
     alerts = []
     
-    # 1. Cảnh báo Lỗi dữ liệu (NaN)
     if pd.isna(temp) or pd.isna(hum):
         alerts.append("❌ DỮ LIỆU LỖI: Không đọc được Nhiệt độ hoặc Độ ẩm. Vui lòng kiểm tra cảm biến DHT22.")
     
-    # 2. Cảnh báo Nguy hiểm Quá nhiệt (> 30C)
     if temp > 30.0:
         alerts.append(f"🔥 NGUY HIỂM: Nhiệt độ quá cao ({temp:.1f}°C). Nguy cơ chết sợi nấm!")
 
-    # 3. Cảnh báo Nguy hiểm Độ ẩm thấp (< 65%)
     if hum < 75.0:
         alerts.append(f"💧 CẢNH BÁO: Độ ẩm quá thấp ({hum:.1f}%). Cần phun sương gấp để tránh chai nấm.")
     
-    # 4. Cảnh báo Độ ẩm Quá cao (Nguy cơ nấm mốc)
     if hum > 95.0:
         alerts.append(f"💧 CẢNH BÁO: Độ ẩm quá cao ({hum:.1f}%). Nguy cơ ngưng tụ và nấm mốc bùng phát.")
 
     if alerts:
         for alert in alerts:
-            st.error(alert) # Dùng st.error để hiển thị nổi bật
+            st.error(alert)
         return True
     return False
 
 
 # --- GIAO DIỆN STREAMLIT ---
 
-# 1. BẬT WIDE LAYOUT ĐỂ DÙNG HẾT CHIỀU RỘNG MÀN HÌNH
 st.set_page_config(
     page_title="Cố vấn Khí hậu Trại Nấm",
-    layout="wide" # Dùng toàn bộ chiều rộng
+    layout="wide"
 )
 
 st.title("🍄 Hệ thống Cố vấn & Phân tích Khí hậu Trại Nấm (AI)")
 
-# Thiết lập Chatbot ở Sidebar
-with st.sidebar:
-    st.header("Trợ lý AI Nấm học")
-    
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["parts"][0]["text"])
+# --- CHIA BỐ CỤC MỚI ---
+# Cột chính (2/3) và Cột chat (1/3)
+main_col, chat_col = st.columns([2, 1])
 
-    if prompt := st.chat_input("Hỏi tôi về môi trường nấm..."):
-        st.session_state.messages.append({"role": "user", "parts": [{"text": prompt}]})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+# --- CỘT CHATBOT BÊN PHẢI ---
+with chat_col:
+    with st.container(height=800, border=True): # Tạo khung chứa cho chatbot
+        st.header("Trợ lý AI Nấm học")
+        
+        # Vùng hiển thị tin nhắn
+        message_container = st.container()
+        for message in st.session_state.messages:
+            with message_container.chat_message(message["role"]):
+                st.markdown(message["parts"][0]["text"])
 
-        with st.chat_message("model"):
-            with st.spinner("AI đang phân tích..."):
-                response = chat_with_gemini(prompt)
-                st.markdown(response)
-        st.session_state.messages.append({"role": "model", "parts": [{"text": response}]})
+        # Vùng nhập liệu
+        if prompt := st.chat_input("Hỏi tôi về môi trường nấm..."):
+            st.session_state.messages.append({"role": "user", "parts": [{"text": prompt}]})
+            with message_container.chat_message("user"):
+                st.markdown(prompt)
 
+            with message_container.chat_message("model"):
+                with st.spinner("AI đang phân tích..."):
+                    response = chat_with_gemini(prompt)
+                    st.markdown(response)
+            st.session_state.messages.append({"role": "model", "parts": [{"text": response}]})
 
-# --- THỰC THI CHÍNH ---
-# LẤY DỮ LIỆU CHỈ MỘT LẦN KHI SCRIPT ĐƯỢC GỌI
-json_data = fetch_data()
-df, latest_data = process_data(json_data)
+# --- CỘT HIỂN THỊ CHÍNH BÊN TRÁI ---
+with main_col:
+    # Lấy và xử lý dữ liệu
+    json_data = fetch_data()
+    df, latest_data = process_data(json_data)
 
-# Tính toán MHI 
-mhi_index = None
-if latest_data is not None:
-    temp = latest_data['Nhiệt độ (°C)']
-    hum = latest_data['Độ ẩm (%)']
-    pump = latest_data['Trạng thái Bơm'] # Lấy trạng thái Bơm
-    fan = latest_data['Trạng thái Quạt'] # Lấy trạng thái Quạt
-    mhi_index = calculate_mushroom_health_index(temp, hum)
-    # LƯU TRỮ TRẠNG THÁI MỚI NHẤT CHO AI TRÒ CHUYỆN
-    st.session_state.latest_climate_data = {"temp": temp, "hum": hum, "mhi": mhi_index, "pump": pump, "fan": fan}
-
-
-# --- 0. HIỂN THỊ CẢNH BÁO NỔI BẬT ---
-if latest_data is not None:
-    display_alerts(latest_data['Nhiệt độ (°C)'], latest_data['Độ ẩm (%)'])
-
-
-# --- 1. HIỂN THỊ DỮ LIỆU THÔ VÀ TÍNH TOÁN MHI ---
-with st.container(border=True):
-    st.subheader("📊 Dữ liệu Cập nhật Mới nhất")
-    
-    if latest_data is None:
-        st.warning("Không thể tải hoặc không có dữ liệu để hiển thị.")
-    else:
+    mhi_index = None
+    if latest_data is not None:
         temp = latest_data['Nhiệt độ (°C)']
         hum = latest_data['Độ ẩm (%)']
-        pump_status = latest_data['Trạng thái Bơm']
-        fan_status = latest_data['Trạng thái Quạt'] # LẤY TRẠNG THÁI QUẠT
+        pump = latest_data['Trạng thái Bơm']
+        fan = latest_data['Trạng thái Quạt']
+        mhi_index = calculate_mushroom_health_index(temp, hum)
+        st.session_state.latest_climate_data = {"temp": temp, "hum": hum, "mhi": mhi_index, "pump": pump, "fan": fan}
+
+    # Hiển thị cảnh báo
+    if latest_data is not None:
+        display_alerts(latest_data['Nhiệt độ (°C)'], latest_data['Độ ẩm (%)'])
+
+    # Hiển thị dữ liệu mới nhất
+    with st.container(border=True):
+        st.subheader("📊 Dữ liệu Cập nhật Mới nhất")
         
-        # 2. KHẮC PHỤC LỖI CẮT CHỮ METRICS BẰNG CÁCH SỬ DỤNG 6 CỘT ĐỀU NHAU
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        if latest_data is None:
+            st.warning("Không thể tải hoặc không có dữ liệu để hiển thị.")
+        else:
+            temp = latest_data['Nhiệt độ (°C)']
+            hum = latest_data['Độ ẩm (%)']
+            pump_status = latest_data['Trạng thái Bơm']
+            fan_status = latest_data['Trạng thái Quạt']
+            
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
+            
+            col1.metric(label="⏰ Giờ VN", value=latest_data['Thời gian'].strftime("%H:%M:%S"))
+            col2.metric(label="🌡 Nhiệt độ", value=f"{temp:.1f} °C", delta_color="off")
+            col3.metric(label="💧 Độ ẩm", value=f"{hum:.1f} %", delta_color="off")
+            
+            pump_text = "ON" if pump_status == 1 else "OFF"
+            pump_color = "inverse" if pump_status == 1 else "off"
+            col4.metric(label="💦 Phun Sương", value=pump_text, delta_color=pump_color)
+            
+            fan_text = "ON" if fan_status == 1 else "OFF"
+            fan_color = "inverse" if fan_status == 1 else "off"
+            col5.metric(label="💨 Thông gió", value=fan_text, delta_color=fan_color)
+
+            if mhi_index is not None:
+                mhi_color = "inverse" if mhi_index > 2.0 else "off"
+                col6.metric(label="💚 Sức khỏe Nấm", value=f"{mhi_index:.2f}", delta_color=mhi_color)
+
+    # Gợi ý AI tự động
+    with st.container(border=True):
+        st.subheader("💡 Gợi ý Tối ưu Môi trường Tự động")
         
-        # Cột 1: Thời gian
-        col1.metric(label="⏰ Giờ VN", value=latest_data['Thời gian'].strftime("%H:%M:%S"))
-        # Cột 2: Nhiệt độ
-        col2.metric(label="🌡 Nhiệt độ", value=f"{temp:.1f} °C", delta_color="off")
-        # Cột 3: Độ ẩm
-        col3.metric(label="💧 Độ ẩm", value=f"{hum:.1f} %", delta_color="off")
+        if latest_data is not None and mhi_index is not None:
+            ai_suggestion = generate_ai_suggestion(temp, hum, mhi_index)
+            
+            st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; color: #1f1f1f;">
+                    <p style="font-size: 16px; margin: 0; font-weight: bold; color: #2e7d32;">Lời khuyên từ Cố vấn AI:</p>
+                    <p style="font-size: 18px; margin: 5px 0 0 0; color: #1f1f1f;">{ai_suggestion}</p>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("Đang chờ dữ liệu ThingSpeak hợp lệ để tạo gợi ý AI...")
+
+    # Biểu đồ
+    with st.container(border=True):
+        st.subheader("📈 Biểu đồ 20 lần đọc gần nhất")
+        if df is not None:
+            chart_data = df[['Thời gian', 'Nhiệt độ (°C)', 'Độ ẩm (%)']].set_index('Thời gian').sort_index()
+            st.line_chart(chart_data, height=300) 
         
-        # Cột 4: Trạng thái Bơm/Phun sương (Rút gọn label)
-        pump_text = "ON" if pump_status == 1 else "OFF"
-        pump_color = "inverse" if pump_status == 1 else "off"
-        col4.metric(label="💦 Phun Sương", value=pump_text, delta_color=pump_color)
-        
-        # Cột 5: Trạng thái Quạt (Rút gọn label)
-        fan_text = "ON" if fan_status == 1 else "OFF"
-        fan_color = "inverse" if fan_status == 1 else "off"
-        col5.metric(label="💨 Thông gió", value=fan_text, delta_color=fan_color)
+        with st.expander("Xem dữ liệu thay đổi cụ thể"):
+            st.dataframe(df)
 
-        # Cột 6: Chỉ số MHI
-        if mhi_index is not None:
-            mhi_color = "inverse" if mhi_index > 2.0 else "off"
-            col6.metric(label="💚 Sức khỏe Nấm", value=f"{mhi_index:.2f}", delta_color=mhi_color)
-
-
-# --- 2. KHU VỰC HIỂN THỊ GỢI Ý AI TỰ ĐỘNG ---
-with st.container(border=True):
-    st.subheader("💡 Gợi ý Tối ưu Môi trường Tự động")
-    
-    if latest_data is not None and mhi_index is not None:
-        ai_suggestion = generate_ai_suggestion(temp, hum, mhi_index)
-        
-        # KHẮC PHỤC LỖI CHỮ BỊ CHÌM: Tăng cường độ tương phản màu sắc
-        st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #2e7d32; color: #1f1f1f;">
-                <p style="font-size: 16px; margin: 0; font-weight: bold; color: #2e7d32;">Lời khuyên từ Cố vấn AI:</p>
-                <p style="font-size: 18px; margin: 5px 0 0 0; color: #1f1f1f;">{ai_suggestion}</p>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-         st.info("Đang chờ dữ liệu ThingSpeak hợp lệ để tạo gợi ý AI...")
-
-
-# --- 3. KHU VỰC HIỂN THỊ BIỂU ĐỒ ---
-with st.container(border=True):
-    st.subheader("📈 Biểu đồ 20 lần đọc gần nhất")
-    if df is not None:
-        # Chỉ vẽ Nhiệt độ và Độ ẩm cho biểu đồ line
-        chart_data = df[['Thời gian', 'Nhiệt độ (°C)', 'Độ ẩm (%)']].set_index('Thời gian').sort_index()
-        # Sử dụng Biểu đồ cột/đường để đẹp hơn
-        st.line_chart(chart_data, height=300) 
-    
-    with st.expander("Xem dữ liệu thay đổi cụ thể"):
-        st.dataframe(df)
-
-# GỌI HÀM LÀM MỚI AN TOÀN
+# GỌI HÀM LÀM MỚI
 check_and_rerun()
