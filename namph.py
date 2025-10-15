@@ -12,7 +12,7 @@ VN_TIMEZONE = pytz.timezone('Asia/Ho_Chi_Minh')
 
 # --- THÔNG SỐ CẤU HÌNH THINGSPEAK ---
 # LƯU Ý: ĐÂY LÀ READ API KEY, KHÔNG PHẢI WRITE API KEY
-CHANNEL_ID = "3096685"
+CHANNEL_ID = "3097264"
 READ_API_KEY = "QZJHRD0BRKMYFOWI"
 THING_SPEAK_URL = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/feeds.json?api_key={READ_API_KEY}&results=20"
 REFRESH_INTERVAL_SECONDS = 5
