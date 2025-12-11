@@ -19,7 +19,7 @@ REFRESH_INTERVAL_SECONDS = 5
 
 # --- CẤU HÌNH GEMINI AI ---
 GEMINI_API_KEY = "AIzaSyAvgpBrMsA2pCjB3Hng-Mjyo1ir-KO_kgQ"
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 # 🍄 PROMPT MỚI: CHỈ SỬ DỤNG 1 QUY TẮC VÀNG TỔNG HỢP 🍄
 SYSTEM_PROMPT = """Bạn là một chuyên gia về nuôi trồng nấm (Mycologist) với kiến thức chuyên sâu về nấm Bào Ngư.
 QUY TẮC VÀNG TỔNG HỢP cho NẤM BÀO NGƯ (Mọi giai đoạn):
@@ -319,4 +319,5 @@ with main_col:
 
 # GỌI HÀM LÀM MỚI
 check_and_rerun()
+
 
