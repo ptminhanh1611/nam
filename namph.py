@@ -157,8 +157,8 @@ def process_data(json_data):
     
     df = df.rename(columns={
         'created_at': 'Thời gian',
-        'field1': 'Độ ẩm (%)',
-        'field2': 'Nhiệt độ (°C)',
+        'field1': 'Nhiệt độ (°C)',
+        'field2': 'Độ ẩm (%)',
         'field3': 'Trạng thái Bơm', 
         'field4': 'Trạng thái Quạt'
     })
@@ -319,3 +319,4 @@ with main_col:
 
 # GỌI HÀM LÀM MỚI
 check_and_rerun()
+
